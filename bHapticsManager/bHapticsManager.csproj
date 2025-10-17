@@ -1,0 +1,77 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+		<TargetFramework>net9.0</TargetFramework>
+		<LangVersion>12.0</LangVersion>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<!-- Change CopyToMods to true if you'd like builds to be moved into the Mods folder automatically-->
+		<CopyToMods Condition="'$(CopyToMods)'==''">true</CopyToMods>
+	</PropertyGroup>
+
+  <PropertyGroup Condition="'$(ResonitePath)'==''">
+    <!-- If you don't want to provide a ResonitePath in dotnet build, you can specify one here -->
+    <ResonitePath>$(MSBuildThisFileDirectory)Resonite/</ResonitePath>
+    <ResonitePath Condition="Exists('E:\SteamLibrary\steamapps\common\Resonite\')">E:\SteamLibrary\steamapps\common\Resonite\</ResonitePath>
+    <ResonitePath Condition="Exists('$(HOME)/.steam/steam/steamapps/common/Resonite/')">$(HOME)/.steam/steam/steamapps/common/Resonite/</ResonitePath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="EngineRefs\**" />
+    <EmbeddedResource Remove="EngineRefs\**" />
+    <None Remove="EngineRefs\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="bHapticsManagerFix.cs" />
+    <Compile Remove="ModenHapticsPlayer.cs" />
+    <Compile Remove="BatteryMonitor.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="bHapticsLib.xml" />
+    <None Remove="whattfdoesthebHapticsLibdoes.md" />
+  </ItemGroup>
+
+	<ItemGroup>
+		<!-- Modernized bHapticsLib from rml_libs (shared library location) -->
+		<Reference Include="Bhaptics.Tact">
+		  <HintPath>E:\SteamLibrary\steamapps\common\Resonite\Bhaptics.Tact.dll</HintPath>
+		</Reference>
+		<Reference Include="bHapticsLib">
+		  <HintPath>$(ResonitePath)rml_libs\bHapticsLib.dll</HintPath>
+		  <Private>False</Private>
+		</Reference>
+		
+		<Reference Include="Elements.Assets">
+		  <HintPath>E:\SteamLibrary\steamapps\common\Resonite\Elements.Assets.dll</HintPath>
+		</Reference>
+		<Reference Include="Elements.Core">
+		  <HintPath>E:\SteamLibrary\steamapps\common\Resonite\Elements.Core.dll</HintPath>
+		</Reference>
+		<Reference Include="Renderite.Shared">
+		  <HintPath>E:\SteamLibrary\steamapps\common\Resonite\Renderite.Shared.dll</HintPath>
+		</Reference>
+		<Reference Include="ResoniteModLoader">
+			<HintPath>$(ResonitePath)Libraries\ResoniteModLoader.dll</HintPath>
+			<Private>False</Private>
+		</Reference>
+		<Reference Include="HarmonyLib">
+			<HintPath>$(ResonitePath)rml_libs\0Harmony.dll</HintPath>
+			<Private>False</Private>
+		</Reference>
+		<Reference Include="FrooxEngine">
+			<HintPath>$(ResonitePath)FrooxEngine.dll</HintPath>
+			<Private>False</Private>
+		</Reference>
+		<Reference Include="SkyFrost.Base.Models">
+		  <HintPath>E:\SteamLibrary\steamapps\common\Resonite\SkyFrost.Base.Models.dll</HintPath>
+		</Reference>
+	</ItemGroup>
+
+	<Target Name="PostBuild" AfterTargets="PostBuildEvent" Condition="'$(CopyToMods)'=='true'">
+		<Message Text="Attempting to copy $(TargetFileName) to $(ResonitePath)rml_mods" Importance="high" />
+		<Copy SourceFiles="$(TargetDir)$(TargetFileName)" DestinationFolder="$(ResonitePath)rml_mods" ContinueOnError="true" />
+		<!-- Note: bHapticsLib.dll should be manually placed in rml_libs folder once -->
+	</Target>
+</Project>
