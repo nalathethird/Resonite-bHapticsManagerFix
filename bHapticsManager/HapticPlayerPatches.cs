@@ -161,7 +161,7 @@ namespace bHapticsManager {
 	[HarmonyPatch(typeof(LegacyBHaptics.HapticPlayer), "Dispose")]
 	public class HapticPlayerDisposePatch {
 		static bool Prefix() {
-			return false;
+			return true;
 		}
 	}
 
