@@ -104,7 +104,8 @@ namespace bHapticsManager {
 			try {
 				_cancellationTokenSource.Cancel();
 			}
-			catch (ObjectDisposedException) {
+			catch (ObjectDisposedException ex) {
+				ResoniteMod.Warn($"Cancellation token source already disposed: {ex}");
 			}
 			
 			_workEvent.Set();
