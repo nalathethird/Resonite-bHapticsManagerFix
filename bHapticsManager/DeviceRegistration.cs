@@ -15,7 +15,6 @@ namespace bHapticsManager {
 		private static readonly object _lock = new object();
 		private static readonly HashSet<ModernBHaptics.PositionID> _registeredDevices = new HashSet<ModernBHaptics.PositionID>();
 		private static readonly Dictionary<ModernBHaptics.PositionID, Task> _pendingRegistrations = new();
-		private static readonly Dictionary<ModernBHaptics.PositionID, List<HapticPoint>> _devicePoints = new Dictionary<ModernBHaptics.PositionID, List<HapticPoint>>();
 		
 		private static InputInterface? _inputInterface;
 		private static BHapticsDriver? _bhapticsDriver;
@@ -36,7 +35,6 @@ namespace bHapticsManager {
 			lock (_registrationLock) {
 				_registeredDevices.Clear();
 				_pendingRegistrations.Clear();
-				_devicePoints.Clear();
 			}
 		}
 

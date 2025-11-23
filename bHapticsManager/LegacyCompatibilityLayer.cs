@@ -21,10 +21,14 @@ namespace bHapticsManager {
 		private static readonly Dictionary<string, DateTime> _lastSubmissionTime = new();
 		private static readonly object _submissionLock = new object();
 		
+		// Minimum interval between submissions for the same device to prevent flooding
 		private const int MIN_SUBMISSION_INTERVAL_MS = 5;
-		private const int MIN_BUFFER_DURATION_MS = 100;
-		private const float INTENSITY_BOOST_THRESHOLD = 0.3f;
-		private const float INTENSITY_BOOST_MULTIPLIER = 1.5f;
+		// Minimum buffer duration for haptic feedback frames (MessagePack allows for faster submission)
+		private const int MIN_BUFFER_DURATION_MS = 50;
+		// Intensity boost feature effectively disabled: multiplier at 1.0 means signals pass through unchanged
+		// (signals with intensity < 100 still enter boost logic, but no actual boost is applied)
+		private const float INTENSITY_BOOST_THRESHOLD = 1.0f;
+		private const float INTENSITY_BOOST_MULTIPLIER = 1.0f;
 		
 		public static void SubmitFrame(string key, LegacyBHaptics.PositionType position, 
 			List<LegacyBHaptics.DotPoint> dotPoints, int durationMillis) {
