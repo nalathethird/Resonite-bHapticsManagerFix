@@ -25,8 +25,8 @@ namespace bHapticsManager {
 		private const int MIN_SUBMISSION_INTERVAL_MS = 5;
 		// Minimum buffer duration for haptic feedback frames (MessagePack allows for faster submission)
 		private const int MIN_BUFFER_DURATION_MS = 50;
-		// Intensity boost feature disabled: threshold at 1.0 (100%) means no signals qualify as "weak"
-		// and multiplier at 1.0 means no boost is applied, maintaining base vibrations as intended
+		// Intensity boost feature effectively disabled: multiplier at 1.0 means signals pass through unchanged
+		// (signals with intensity < 100 still enter boost logic, but no actual boost is applied)
 		private const float INTENSITY_BOOST_THRESHOLD = 1.0f;
 		private const float INTENSITY_BOOST_MULTIPLIER = 1.0f;
 		
