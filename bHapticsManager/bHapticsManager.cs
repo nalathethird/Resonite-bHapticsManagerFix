@@ -126,13 +126,10 @@ namespace bHapticsManager {
                     Warn("No focused world, initializing on next world focus");
                     engine.WorldManager.WorldFocused += (world) =>
                     {
-                        if (world != null)
+                        if (world != null && Interlocked.CompareExchange(ref _initialized, true, false) == false)
                         {
                             // Atomically set _initialized to true if it was false
-                            if (Interlocked.CompareExchange(ref _initialized, true, false) == false)
-                            {
-                                world.RunSynchronously(() => InitializeHaptics());
-                            }
+                            world.RunSynchronously(() => InitializeHaptics());
                         }
                     };
                 }
