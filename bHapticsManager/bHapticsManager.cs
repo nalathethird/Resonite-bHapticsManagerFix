@@ -143,7 +143,7 @@ namespace bHapticsManager {
                                 {
                                     Error($"Failed to initialize haptics on world focus: {ex}");
                                     // Reset _initialized to allow retry on next world focus
-                                    _initialized = false;
+                                    Interlocked.Exchange(ref _initialized, false);
                                 }
                             }
                         }
