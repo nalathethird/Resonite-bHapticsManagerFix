@@ -15,7 +15,7 @@ namespace bHapticsManager {
 		public override string Version => VERSION_CONSTANT;
 		public override string Link => "https://github.com/nalathethird/bHapticsManager";
 
-		public static ModConfiguration Config = null!;
+		public static ModConfiguration? Config = null;
 
 		[AutoRegisterConfigKey]
 		public static readonly ModConfigurationKey<bool> ENABLE_HOTPLUG =
