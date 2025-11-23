@@ -1,0 +1,155 @@
+name: Bug Report
+description: Report a bug or issue with bHapticsManager
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please fill out the information below to help us diagnose and fix the issue.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is.
+      placeholder: Tell us what happened
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps-to-reproduce
+    attributes:
+      label: Steps to Reproduce
+      description: Steps to reproduce the behavior
+      placeholder: |
+        1. Launch Resonite with '...'
+        2. Connect/disconnect bHaptics device '...'
+        3. Touch haptic point '...'
+        4. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected Behavior
+      description: A clear and concise description of what you expected to happen.
+      placeholder: What should have happened?
+    validations:
+      required: true
+
+  - type: input
+    id: resonite-version
+    attributes:
+      label: Resonite Version
+      description: What version of Resonite are you using?
+      placeholder: "e.g., Beta 2025.9.23.1237"
+    validations:
+      required: true
+
+  - type: input
+    id: mod-version
+    attributes:
+      label: bHapticsManager Version
+      description: What version of bHapticsManager are you using?
+      placeholder: "e.g., v1.0.0 or commit hash"
+    validations:
+      required: true
+
+  - type: input
+    id: bhapticslib-version
+    attributes:
+      label: bHapticsLib Version
+      description: What version of bHapticsLib.dll do you have installed?
+      placeholder: "e.g., v1.0.9"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: device-type
+    attributes:
+      label: bHaptics Device(s)
+      description: Which bHaptics device(s) are you using?
+      multiple: true
+      options:
+        - TactSuit X40
+        - TactSuit X16
+        - Tactosy for Arms
+        - Tactosy for Hands
+        - Tactosy for Feet
+        - TactGlove
+        - TactVisor
+        - Other (please specify in additional context)
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: mod-config
+    attributes:
+      label: Mod Configuration
+      description: Which settings do you have enabled?
+      options:
+        - label: enable_hotplug (default is true)
+        - label: enable_self_haptics (default is false)
+        - label: enable_diagnostic_logging (default is false)
+
+  - type: dropdown
+    id: issue-category
+    attributes:
+      label: Issue Category
+      description: What type of issue are you experiencing?
+      options:
+        - Mod won't load / initialization error
+        - Devices not detected
+        - Haptics not working / no feedback
+        - Weak or delayed haptic feedback
+        - Buffer jam / lag spikes
+        - Hot-plug not working
+        - Self-touch haptics not working
+        - Crash / freeze
+        - Other (please specify in description)
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Resonite Log File
+      description: |
+        Please attach or paste relevant portions of your Resonite log file.
+        Log location: `C:\Program Files (x86)\Steam\steamapps\common\Resonite\Logs`
+        **Tip**: Enable `enable_diagnostic_logging` for more detailed output if the issue is hard to reproduce.
+      placeholder: Paste log content here or drag and drop the log file
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: |
+        Add any other context about the problem here.
+        - Screenshots or videos
+        - Other mods installed (possible conflicts)
+        - Did this work previously? When did it start failing?
+        - Any workarounds you've found?
+      placeholder: Any additional information that might help
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Pre-submission Checklist
+      description: Please confirm you have completed these steps before submitting
+      options:
+        - label: I have checked the [known issues](https://github.com/nalathethird/bHapticsManager#known-issues) in the README
+          required: true
+        - label: I have verified bHapticsLib.dll v1.0.9+ is installed in the `rml_libs` folder
+          required: true
+        - label: I have verified bHaptics Player is running and devices are connected in it
+          required: true
+        - label: I have checked for existing issues that match my problem
+          required: true
