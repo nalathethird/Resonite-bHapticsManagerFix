@@ -12,7 +12,7 @@ namespace bHapticsManager {
 	public static class TorsoMapperFix {
 		public static void ApplyPatches(Harmony harmony) {
 			try {
-				harmony.PatchAll(typeof(CommonAvatarBuilderPatch).Assembly);
+				harmony.PatchAll(typeof(TorsoMapperFix));
 				ResoniteMod.Debug("TorsoMapperFix patches applied successfully");
 			}
 			catch (Exception ex) {
