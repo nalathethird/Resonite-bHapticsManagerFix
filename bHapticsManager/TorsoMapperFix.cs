@@ -10,7 +10,7 @@ using ResoniteModLoader;
 namespace bHapticsManager {
 	
 	public static class TorsoMapperFix {
-		private static Harmony? _harmonyInstance = null;
+		internal static Harmony? _harmonyInstance = null;
 		
 		public static void ApplyPatches(Harmony harmony) {
 			try {
