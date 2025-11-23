@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Troubleshooting Guide
+    url: https://github.com/nalathethird/bHapticsManager#troubleshooting
+    about: Check the troubleshooting section in the README for common issues
+  - name: Resonite Community
+    url: https://discord.gg/resonite
+    about: Ask for help in the Resonite Discord community
+  - name: Support the Developer
+    url: https://ko-fi.com/nalathethird
+    about: Support the developer on Ko-fi if this mod has been helpful!
