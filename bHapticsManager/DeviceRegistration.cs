@@ -12,7 +12,6 @@ using ModernBHaptics = bHapticsLib;
 namespace bHapticsManager {
 
 	public static class DeviceRegistration {
-		private static readonly object _lock = new object();
 		private static readonly HashSet<ModernBHaptics.PositionID> _registeredDevices = new HashSet<ModernBHaptics.PositionID>();
 		private static readonly Dictionary<ModernBHaptics.PositionID, Task> _pendingRegistrations = new();
 		
