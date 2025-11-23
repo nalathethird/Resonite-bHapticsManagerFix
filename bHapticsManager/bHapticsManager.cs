@@ -130,7 +130,7 @@ namespace bHapticsManager {
                         if (world != null && Interlocked.CompareExchange(ref _initialized, true, false) == false)
                         {
                             // Atomically set _initialized to true if it was false
-                            if (Interlocked.CompareExchange(ref _initialized, true, false) == false)
+                            if (!Interlocked.CompareExchange(ref _initialized, true, false))
                             {
                                 try
                                 {
