@@ -16,7 +16,10 @@ namespace bHapticsManager {
 
         public void Initialize(ModernBHapticsWorkerThread workerThread)
         {
-            _workerThread = workerThread;
+            lock (_lock)
+            {
+                _workerThread = workerThread;
+            }
             
             try
             {
@@ -60,6 +63,7 @@ namespace bHapticsManager {
 
                 lock (_lock)
                 {
+                    if (_disposed) return;
                     _workerThread?.OnDeviceConnected(position);
                 }
             }
