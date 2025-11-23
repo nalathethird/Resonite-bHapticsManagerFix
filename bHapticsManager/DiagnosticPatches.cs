@@ -80,7 +80,8 @@ namespace bHapticsManager {
 						}
 					}
 				}
-				catch {
+				catch (Exception ex) {
+					ResoniteMod.Error($"Error in HapticPoint sample diagnostic: {ex.Message}");
 				}
 			}
 		}
