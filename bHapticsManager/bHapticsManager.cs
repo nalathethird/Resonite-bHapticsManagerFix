@@ -127,7 +127,7 @@ namespace bHapticsManager {
                     
                     void WorldFocusedHandler(World world)
                     {
-                        if (world != null)
+                        if (world != null && Interlocked.CompareExchange(ref _initialized, true, false) == false)
                         {
                             // Atomically set _initialized to true if it was false
                             if (Interlocked.CompareExchange(ref _initialized, true, false) == false)
@@ -154,7 +154,7 @@ namespace bHapticsManager {
                 else
                 {
                     // Atomically set _initialized to true if it was false
-                    if (Interlocked.CompareExchange(ref _initialized, true, false) == false)
+                    if (!Interlocked.CompareExchange(ref _initialized, true, false))
                     {
                         focusedWorld.RunSynchronously(() => InitializeHaptics());
                     }
@@ -256,11 +256,11 @@ namespace bHapticsManager {
             }
         }
 
-        private static void OnEngineShutdown(string reason)
+        private static void OnEngineShutdown()
         {
             try
             {
-                ResoniteMod.Debug($"Engine shutdown requested: {reason}");
+                ResoniteMod.Debug("Engine shutdown requested.");
                 Msg("Starting bHapticsManager shutdown...");
 
                 if (_eventHandler != null)

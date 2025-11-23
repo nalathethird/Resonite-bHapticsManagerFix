@@ -110,18 +110,16 @@ namespace bHapticsManager {
 			
 			_workEvent.Set();
 			
-			if (_workerThread != null && _workerThread.IsAlive) {
-				if (!_workerThread.Join(TimeSpan.FromSeconds(2))) {
-					bHapticsManager.Warn("Worker thread did not stop gracefully, interrupting...");
-					try {
-						_workerThread.Interrupt();
-						if (!_workerThread.Join(TimeSpan.FromSeconds(1))) {
-							bHapticsManager.Warn("Worker thread did not respond to interrupt");
-						}
+			if (_workerThread != null && _workerThread.IsAlive && !_workerThread.Join(TimeSpan.FromSeconds(2))) {
+				bHapticsManager.Warn("Worker thread did not stop gracefully, interrupting...");
+				try {
+					_workerThread.Interrupt();
+					if (!_workerThread.Join(TimeSpan.FromSeconds(1))) {
+						bHapticsManager.Warn("Worker thread did not respond to interrupt");
 					}
-					catch (Exception ex) {
-						bHapticsManager.Error($"Error interrupting worker thread: {ex}");
-					}
+				}
+				catch (Exception ex) {
+					bHapticsManager.Error($"Error interrupting worker thread: {ex}");
 				}
 			}
 			
@@ -143,12 +141,11 @@ namespace bHapticsManager {
 					LegacyBHaptics.PositionType deviceType = GetDeviceTypeFromPosition(point.Position);
 
 					if (!_hapticPointsByDevice.TryGetValue(deviceType, out List<HapticPointData>? value)) {
-						value = ([new(point)]);
+						value = new List<HapticPointData>();
 						_hapticPointsByDevice[deviceType] = value;
 						_deviceKeys[deviceType] = Guid.NewGuid().ToString();
-					} else {
-						value.Add(new(point));
 					}
+					value.Add(new(point));
 				}
 
 				return true;
