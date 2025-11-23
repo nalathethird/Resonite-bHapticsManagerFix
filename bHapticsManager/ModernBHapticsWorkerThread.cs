@@ -110,18 +110,16 @@ namespace bHapticsManager {
 			
 			_workEvent.Set();
 			
-			if (_workerThread != null && _workerThread.IsAlive) {
-				if (!_workerThread.Join(TimeSpan.FromSeconds(2))) {
-					bHapticsManager.Warn("Worker thread did not stop gracefully, interrupting...");
-					try {
-						_workerThread.Interrupt();
-						if (!_workerThread.Join(TimeSpan.FromSeconds(1))) {
-							bHapticsManager.Warn("Worker thread did not respond to interrupt");
-						}
+			if (_workerThread != null && _workerThread.IsAlive && !_workerThread.Join(TimeSpan.FromSeconds(2))) {
+				bHapticsManager.Warn("Worker thread did not stop gracefully, interrupting...");
+				try {
+					_workerThread.Interrupt();
+					if (!_workerThread.Join(TimeSpan.FromSeconds(1))) {
+						bHapticsManager.Warn("Worker thread did not respond to interrupt");
 					}
-					catch (Exception ex) {
-						bHapticsManager.Error($"Error interrupting worker thread: {ex}");
-					}
+				}
+				catch (Exception ex) {
+					bHapticsManager.Error($"Error interrupting worker thread: {ex}");
 				}
 			}
 			
