@@ -1,15 +1,30 @@
-// LegacyCompatibilityLayer.cs
-// Provides exact Bhaptics.Tact behavior using modern bHapticsLib
-
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using LegacyBHaptics = Bhaptics.Tact;
 using ModernBHaptics = bHapticsLib;
+using ResoniteModLoader;
+using HarmonyLib;
 
 namespace bHapticsManager {
 	public static class LegacyCompatibilityLayer {
 		
+		public static void ApplyPatches(Harmony harmony) {
+			try {
+				ResoniteMod.Debug("LegacyCompatibilityLayer initialized successfully");
+			}
+			catch (Exception ex) {
+				ResoniteMod.Error($"Failed to initialize LegacyCompatibilityLayer: {ex}");
+			}
+		}
+		
 		private static readonly Dictionary<string, DateTime> _lastSubmissionTime = new();
 		private static readonly object _submissionLock = new object();
-		private const int MIN_SUBMISSION_INTERVAL_MS = 10;
+		
+		private const int MIN_SUBMISSION_INTERVAL_MS = 5;
+		private const int MIN_BUFFER_DURATION_MS = 100;
+		private const float INTENSITY_BOOST_THRESHOLD = 0.3f;
+		private const float INTENSITY_BOOST_MULTIPLIER = 1.5f;
 		
 		public static void SubmitFrame(string key, LegacyBHaptics.PositionType position, 
 			List<LegacyBHaptics.DotPoint> dotPoints, int durationMillis) {
@@ -47,6 +62,9 @@ namespace bHapticsManager {
 				if (_lastSubmissionTime.TryGetValue(deviceKey, out DateTime lastTime)) {
 					double timeSinceLastMs = (DateTime.Now - lastTime).TotalMilliseconds;
 					if (timeSinceLastMs < MIN_SUBMISSION_INTERVAL_MS) {
+						if (bHapticsManager.Config?.GetValue(bHapticsManager.ENABLE_DIAGNOSTIC_LOGGING) ?? false) {
+							ResoniteMod.Debug($"Throttled submission for {position} (only {timeSinceLastMs:F1}ms since last)");
+						}
 						return;
 					}
 				}
@@ -76,25 +94,50 @@ namespace bHapticsManager {
 			int[] motors = new int[motorCount];
 			
 			if (dotPoints != null) {
+				bool hasWeakSignals = false;
+				float maxIntensity = 0f;
+				
+				foreach (var legacy in dotPoints) {
+					if (legacy.Intensity > 0 && legacy.Intensity < INTENSITY_BOOST_THRESHOLD * 100) {
+						hasWeakSignals = true;
+					}
+					maxIntensity = Math.Max(maxIntensity, legacy.Intensity);
+				}
+				
 				foreach (var legacy in dotPoints) {
 					if (legacy.Intensity > 0 && legacy.Index < motorCount) {
-						motors[legacy.Index] = Math.Min(100, legacy.Intensity);
+						int intensity = legacy.Intensity;
+						
+						if (hasWeakSignals && intensity < INTENSITY_BOOST_THRESHOLD * 100 && intensity > 0) {
+							intensity = Math.Min(100, (int)(intensity * INTENSITY_BOOST_MULTIPLIER));
+							
+							if (bHapticsManager.Config?.GetValue(bHapticsManager.ENABLE_DIAGNOSTIC_LOGGING) ?? false) {
+								ResoniteMod.Debug($"Boosted motor {legacy.Index} from {legacy.Intensity} to {intensity}");
+							}
+						}
+						
+						motors[legacy.Index] = Math.Min(100, intensity);
 					}
 				}
 			}
 			
-			int extendedDuration = Math.Max(40, durationMillis);
+			int bufferedDuration = Math.Max(MIN_BUFFER_DURATION_MS, durationMillis * 3);
+			
+			if (bHapticsManager.Config?.GetValue(bHapticsManager.ENABLE_DIAGNOSTIC_LOGGING) ?? false) {
+				int activeMotors = motors.Count(m => m > 0);
+				ResoniteMod.Debug($"Submitting to {position}: {activeMotors} active motors, duration {bufferedDuration}ms (requested {durationMillis}ms)");
+			}
 			
 			try {
 				ModernBHaptics.bHapticsManager.PlayMotors(
 					key, 
-					extendedDuration, 
+					bufferedDuration, 
 					modernPosition, 
 					motors
 				);
 			}
 			catch (Exception ex) {
-				ResoniteModLoader.ResoniteMod.Warn($"Failed to submit for {position}: {ex.Message}");
+				ResoniteMod.Warn($"Failed to submit for {position}: {ex.Message}");
 			}
 		}
 		

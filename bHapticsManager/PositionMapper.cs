@@ -1,5 +1,3 @@
-// PositionMapper.cs
-// Maps between legacy and modern bHaptics position types
 
 using LegacyBHaptics = Bhaptics.Tact;
 using ModernBHaptics = bHapticsLib;
@@ -40,7 +38,7 @@ namespace bHapticsManager {
 			};
 		}
 
-		public static int[] ConvertDotPointsToMotorArray(List<LegacyBHaptics.DotPoint> legacyPoints, ModernBHaptics.PositionID position) {
+		public static int[]? ConvertDotPointsToMotorArray(List<LegacyBHaptics.DotPoint> legacyPoints, ModernBHaptics.PositionID position) {
 			if (legacyPoints == null || legacyPoints.Count == 0)
 				return null;
 

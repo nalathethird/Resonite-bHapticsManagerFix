@@ -13,45 +13,14 @@
     <!-- If you don't want to provide a ResonitePath in dotnet build, you can specify one here -->
     <ResonitePath>$(MSBuildThisFileDirectory)Resonite/</ResonitePath>
     <ResonitePath Condition="Exists('E:\SteamLibrary\steamapps\common\Resonite\')">E:\SteamLibrary\steamapps\common\Resonite\</ResonitePath>
+    <ResonitePath Condition="Exists('C:\Program Files (x86)\Steam\steamapps\common\Resonite\')">C:\Program Files (x86)\Steam\steamapps\common\Resonite\</ResonitePath>
     <ResonitePath Condition="Exists('$(HOME)/.steam/steam/steamapps/common/Resonite/')">$(HOME)/.steam/steam/steamapps/common/Resonite/</ResonitePath>
   </PropertyGroup>
 
-  <ItemGroup>
-    <Compile Remove="EngineRefs\**" />
-    <EmbeddedResource Remove="EngineRefs\**" />
-    <None Remove="EngineRefs\**" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Compile Remove="bHapticsManagerFix.cs" />
-    <Compile Remove="ModenHapticsPlayer.cs" />
-    <Compile Remove="BatteryMonitor.cs" />
-    <Compile Remove="MessagePackProtocol.cs" />
-    <Compile Remove="MessagePackSerializer_bHaptics.cs" />
-  </ItemGroup>
-  
-  <ItemGroup>
-    <None Remove="bHapticsLib.xml" />
-    <None Remove="CLEANUP_AND_FIXES_v1.0.3.md" />
-    <None Remove="COMPLETE_FIX_GUIDE_v1.0.4.md" />
-    <None Remove="COMPLETE_FIX_PLAN.md" />
-    <None Remove="CRITICAL_FIX_SUMMARY.md" />
-    <None Remove="CRITICAL_ISSUES_ANALYSIS.md" />
-    <None Remove="DESKTOP-E6J87SV - 2025.9.23.1237 - 2025-11-11 17_04_48.log" />
-    <None Remove="DESKTOP-E6J87SV - 2025.9.23.1237 - 2025-11-11 17_11_46.log" />
-    <None Remove="DOCUMENTATION_COVERAGE_SUMMARY.md" />
-    <None Remove="DUPLICATE_CONNECTION_FIX.md" />
-    <None Remove="EngineRefs_Core_Haptics_System_Documentation.md" />
-    <None Remove="EngineRefs_Haptics_Documentation.md" />
-    <None Remove="EXECUTIVE_SUMMARY.md" />
-    <None Remove="FIXES_IMPLEMENTED.md" />
-    <None Remove="QUICK_FIX_REFERENCE_v1.0.4.md" />
-  </ItemGroup>
-
 	<ItemGroup>
-		<!-- Modernized bHapticsLib from rml_libs (shared library location) -->
 		<Reference Include="Bhaptics.Tact">
-		  <HintPath>E:\SteamLibrary\steamapps\common\Resonite\Bhaptics.Tact.dll</HintPath>
+		  <HintPath>$(ResonitePath)Bhaptics.Tact.dll</HintPath>
+		  <Private>False</Private>
 		</Reference>
 		<Reference Include="bHapticsLib">
 		  <HintPath>$(ResonitePath)rml_libs\bHapticsLib.dll</HintPath>
@@ -59,13 +28,16 @@
 		</Reference>
 		
 		<Reference Include="Elements.Assets">
-		  <HintPath>E:\SteamLibrary\steamapps\common\Resonite\Elements.Assets.dll</HintPath>
+		  <HintPath>$(ResonitePath)Elements.Assets.dll</HintPath>
+		  <Private>False</Private>
 		</Reference>
 		<Reference Include="Elements.Core">
-		  <HintPath>E:\SteamLibrary\steamapps\common\Resonite\Elements.Core.dll</HintPath>
+		  <HintPath>$(ResonitePath)Elements.Core.dll</HintPath>
+		  <Private>False</Private>
 		</Reference>
 		<Reference Include="Renderite.Shared">
-		  <HintPath>E:\SteamLibrary\steamapps\common\Resonite\Renderite.Shared.dll</HintPath>
+		  <HintPath>$(ResonitePath)Renderite.Shared.dll</HintPath>
+		  <Private>False</Private>
 		</Reference>
 		<Reference Include="ResoniteModLoader">
 			<HintPath>$(ResonitePath)Libraries\ResoniteModLoader.dll</HintPath>
@@ -80,7 +52,8 @@
 			<Private>False</Private>
 		</Reference>
 		<Reference Include="SkyFrost.Base.Models">
-		  <HintPath>E:\SteamLibrary\steamapps\common\Resonite\SkyFrost.Base.Models.dll</HintPath>
+		  <HintPath>$(ResonitePath)SkyFrost.Base.Models.dll</HintPath>
+		  <Private>False</Private>
 		</Reference>
 	</ItemGroup>
 

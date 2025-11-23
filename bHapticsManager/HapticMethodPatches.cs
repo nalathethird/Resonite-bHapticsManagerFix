@@ -1,7 +1,5 @@
-// HapticMethodPatches.cs
-// Harmony patches that intercept HapticPlayer methods (IsActive, Submit)
-// and properly handle remote haptic data synchronization
-
+using System;
+using System.Collections.Generic;
 using Elements.Core;
 using HarmonyLib;
 using ResoniteModLoader;
@@ -11,6 +9,18 @@ using LegacyBHaptics = Bhaptics.Tact;
 using ModernBHaptics = bHapticsLib;
 
 namespace bHapticsManager {
+	
+	public static class HapticMethodPatches {
+		public static void ApplyPatches(Harmony harmony) {
+			try {
+				harmony.PatchAll(typeof(IsActivePatch).Assembly);
+				ResoniteMod.Debug("HapticMethodPatches applied successfully");
+			}
+			catch (Exception ex) {
+				ResoniteMod.Error($"Failed to apply HapticMethodPatches: {ex}");
+			}
+		}
+	}
 	
 	[HarmonyPatch(typeof(LegacyBHaptics.HapticPlayer), "IsActive")]
 	public class IsActivePatch {
@@ -85,7 +95,7 @@ namespace bHapticsManager {
 					_updateCount++;
 					
 					if ((DateTime.Now - _lastDiagnostic).TotalSeconds >= 10 || (hasActivity && _updateCount % 100 == 0)) {
-						ResoniteMod.Msg($"[HapticData#{index}] user={user?.UserName ?? "null"} isLocal={isLocalUser} isRemote={isRemoteUser} unowned={isUnownedData} selfEnabled={enableSelfHaptics} activity={hasActivity}");
+						ResoniteMod.Debug($"[HapticData#{index}] user={user?.UserName ?? "null"} isLocal={isLocalUser} isRemote={isRemoteUser} unowned={isUnownedData} selfEnabled={enableSelfHaptics} activity={hasActivity}");
 						_lastDiagnostic = DateTime.Now;
 					}
 				}
@@ -106,7 +116,7 @@ namespace bHapticsManager {
 							_registeredRemoteSources.Add(index);
 							
 							if (isDiagnosticEnabled) {
-								ResoniteMod.Msg($"Registered RemoteHapticSource for point {index}");
+								ResoniteMod.Debug($"Registered RemoteHapticSource for point {index}");
 							}
 						}
 					} else {
@@ -124,7 +134,7 @@ namespace bHapticsManager {
 						__instance.TotalActivationIntensity.Value = point.TotalActivationIntensity;
 						
 						if (isDiagnosticEnabled && (point.Force > 0f || point.Pain > 0f)) {
-							ResoniteMod.Msg($"Self-haptics active for point {index}: F={point.Force:F2} P={point.Pain:F2}");
+							ResoniteMod.Debug($"Self-haptics active for point {index}: F={point.Force:F2} P={point.Pain:F2}");
 						}
 						
 						return false;
