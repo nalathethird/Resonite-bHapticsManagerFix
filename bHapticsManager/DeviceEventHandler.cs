@@ -10,7 +10,7 @@ namespace bHapticsManager {
 	
 	public class DeviceEventHandler : IDisposable
     {
-        private bool _disposed;
+        private volatile bool _disposed;
         private ModernBHapticsWorkerThread _workerThread = null!;
         private readonly object _lock = new object();
 
