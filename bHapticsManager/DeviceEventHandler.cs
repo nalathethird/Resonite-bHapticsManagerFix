@@ -111,6 +111,8 @@ namespace bHapticsManager {
         {
             if (_disposed) return;
             
+            _disposed = true;
+            
             try
             {
                 if (BHapticsConnection.Instance != null)
@@ -128,7 +130,6 @@ namespace bHapticsManager {
             lock (_lock)
             {
                 _workerThread = null!;
-                _disposed = true;
             }
         }
     }
