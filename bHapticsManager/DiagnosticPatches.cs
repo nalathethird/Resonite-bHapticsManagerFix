@@ -101,7 +101,8 @@ namespace bHapticsManager {
 						_lastLog = DateTime.Now;
 					}
 				}
-				catch {
+				catch (Exception ex) {
+					ResoniteMod.Debug($"[DirectTag Diagnostic] Exception: {ex}");
 				}
 			}
 		}
