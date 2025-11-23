@@ -109,7 +109,7 @@ namespace bHapticsManager {
 			public RefID ReferenceID => RefID.Null;
 			public string Name => "DummyParent";
 			public World World => _world;
-			public IWorldElement Parent => this;
+			public IWorldElement Parent => null;
 			public bool IsLocalElement => false;
 			public bool IsPersistent => false;
 			public bool IsRemoved => false;
