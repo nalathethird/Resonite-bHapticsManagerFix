@@ -24,7 +24,7 @@ namespace bHapticsManager {
 		
 		// Haptic frame duration: how long each submitted frame persists on the device
 		// Increased from 40ms to 100ms to ensure smooth overlap between frames and prevent gaps.
-		// The 100ms duration (with 8ms updates) provides ~12x frame overlap, creating seamless
+		// The 100ms duration (with 8ms updates) provides ~12.5x frame overlap, creating seamless
 		// haptic transitions. Too short a duration can cause perceptible stuttering or dropouts,
 		// while too long can reduce responsiveness to rapid intensity changes.
 		private const int SUBMISSION_DURATION_MS = 100;
