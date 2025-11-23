@@ -241,11 +241,11 @@ namespace bHapticsManager {
             }
         }
 
-        private static void OnEngineShutdown(string reason)
+        private static void OnEngineShutdown()
         {
             try
             {
-                ResoniteMod.Debug($"Engine shutdown requested: {reason}");
+                ResoniteMod.Debug("Engine shutdown requested.");
                 Msg("Starting bHapticsManager shutdown...");
 
                 if (_eventHandler != null)
