@@ -101,12 +101,7 @@ namespace bHapticsManager {
 			ResoniteMod.Debug("Stopping worker thread...");
 			_running = false;
 			
-			try {
-				_cancellationTokenSource.Cancel();
-			}
-			catch (ObjectDisposedException ex) {
-				ResoniteMod.Warn($"Cancellation token source already disposed: {ex}");
-			}
+			_cancellationTokenSource.Cancel();
 			
 			_workEvent.Set();
 			
