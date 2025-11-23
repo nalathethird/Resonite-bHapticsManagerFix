@@ -127,10 +127,10 @@ namespace bHapticsManager {
                     
                     void WorldFocusedHandler(World world)
                     {
-                        if (world != null && !Interlocked.CompareExchange(ref _initialized, true, false))
+                        if (world != null)
                         {
                             // Atomically set _initialized to true if it was false
-                            if (!Interlocked.CompareExchange(ref _initialized, true, false))
+                            if (Interlocked.CompareExchange(ref _initialized, true, false) == false)
                             {
                                 try
                                 {
@@ -154,7 +154,7 @@ namespace bHapticsManager {
                 else
                 {
                     // Atomically set _initialized to true if it was false
-                    if (!Interlocked.CompareExchange(ref _initialized, true, false))
+                    if (Interlocked.CompareExchange(ref _initialized, true, false) == false)
                     {
                         focusedWorld.RunSynchronously(() => InitializeHaptics());
                     }
