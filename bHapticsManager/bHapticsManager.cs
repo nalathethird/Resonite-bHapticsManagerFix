@@ -127,24 +127,21 @@ namespace bHapticsManager {
                     
                     void WorldFocusedHandler(World world)
                     {
-                        if (world != null)
+                        // Check if initialization is needed and atomically set _initialized to true
+                        if (world != null && !Interlocked.CompareExchange(ref _initialized, true, false))
                         {
-                            // Check if initialization is needed and atomically set _initialized to true
-                            if (!Interlocked.CompareExchange(ref _initialized, true, false))
+                            try
                             {
-                                try
-                                {
-                                    world.RunSynchronously(() => InitializeHaptics());
-                                    // Unsubscribe from the event after first successful initialization
-                                    engine.WorldManager.WorldFocused -= WorldFocusedHandler;
-                                    ResoniteMod.Debug("WorldFocused event handler unsubscribed after initialization");
-                                }
-                                catch (Exception ex)
-                                {
-                                    Error($"Failed to initialize haptics on world focus: {ex}");
-                                    // Reset _initialized to allow retry on next world focus
-                                    Interlocked.Exchange(ref _initialized, false);
-                                }
+                                world.RunSynchronously(() => InitializeHaptics());
+                                // Unsubscribe from the event after first successful initialization
+                                engine.WorldManager.WorldFocused -= WorldFocusedHandler;
+                                ResoniteMod.Debug("WorldFocused event handler unsubscribed after initialization");
+                            }
+                            catch (Exception ex)
+                            {
+                                Error($"Failed to initialize haptics on world focus: {ex}");
+                                // Reset _initialized to allow retry on next world focus
+                                Interlocked.Exchange(ref _initialized, false);
                             }
                         }
                     }
