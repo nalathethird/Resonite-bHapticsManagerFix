@@ -10,8 +10,11 @@ using ResoniteModLoader;
 namespace bHapticsManager {
 	
 	public static class TorsoMapperFix {
+		private static Harmony? _harmonyInstance = null;
+		
 		public static void ApplyPatches(Harmony harmony) {
 			try {
+				_harmonyInstance = harmony;
 				harmony.PatchAll(typeof(TorsoMapperFix));
 				ResoniteMod.Debug("TorsoMapperFix patches applied successfully");
 			}
@@ -28,9 +31,8 @@ namespace bHapticsManager {
 		
 		static void Postfix(UserRoot userRoot) {
 			try {
-				if (!_torsoMapperPatchApplied) {
-					var harmony = new Harmony("com.nalathethird.bHapticsManager.TorsoMapper");
-					ApplyTorsoMapperPatch(harmony);
+				if (!_torsoMapperPatchApplied && TorsoMapperFix._harmonyInstance != null) {
+					ApplyTorsoMapperPatch(TorsoMapperFix._harmonyInstance);
 					_torsoMapperPatchApplied = true;
 				}
 			}
