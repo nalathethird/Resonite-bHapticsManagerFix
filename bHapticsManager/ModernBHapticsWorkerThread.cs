@@ -143,12 +143,11 @@ namespace bHapticsManager {
 					LegacyBHaptics.PositionType deviceType = GetDeviceTypeFromPosition(point.Position);
 
 					if (!_hapticPointsByDevice.TryGetValue(deviceType, out List<HapticPointData>? value)) {
-						value = ([new(point)]);
+						value = new List<HapticPointData>();
 						_hapticPointsByDevice[deviceType] = value;
 						_deviceKeys[deviceType] = Guid.NewGuid().ToString();
-					} else {
-						value.Add(new(point));
 					}
+					value.Add(new(point));
 				}
 
 				return true;
