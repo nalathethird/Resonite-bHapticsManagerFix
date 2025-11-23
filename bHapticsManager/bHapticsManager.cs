@@ -124,14 +124,32 @@ namespace bHapticsManager {
                 if (focusedWorld == null)
                 {
                     Warn("No focused world, initializing on next world focus");
-                    engine.WorldManager.WorldFocused += (world) =>
+                    
+                    void WorldFocusedHandler(World world)
                     {
                         if (world != null && !Interlocked.CompareExchange(ref _initialized, true, false))
                         {
                             // Atomically set _initialized to true if it was false
-                            world.RunSynchronously(() => InitializeHaptics());
+                            if (!Interlocked.CompareExchange(ref _initialized, true, false))
+                            {
+                                try
+                                {
+                                    world.RunSynchronously(() => InitializeHaptics());
+                                    // Unsubscribe from the event after first successful initialization
+                                    engine.WorldManager.WorldFocused -= WorldFocusedHandler;
+                                    ResoniteMod.Debug("WorldFocused event handler unsubscribed after initialization");
+                                }
+                                catch (Exception ex)
+                                {
+                                    Error($"Failed to initialize haptics on world focus: {ex}");
+                                    // Reset _initialized to allow retry on next world focus
+                                    Interlocked.Exchange(ref _initialized, false);
+                                }
+                            }
                         }
-                    };
+                    }
+                    
+                    engine.WorldManager.WorldFocused += WorldFocusedHandler;
                 }
                 else
                 {
