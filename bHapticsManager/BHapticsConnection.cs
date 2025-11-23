@@ -17,6 +17,7 @@ namespace bHapticsManager {
 		
 		private static ModernBHapticsWorkerThread _workerThread = null!;
 		private static bool _isInitialized = false;
+		private static readonly object _initializeLock = new();
 		private static readonly object _shutdownLock = new();
 		private static bool _isShuttingDown = false;
 
@@ -37,36 +38,38 @@ namespace bHapticsManager {
 		/// Called once during mod initialization.
 		
 		public static bool Initialize() {
-			if (_isInitialized) {
-				ResoniteMod.Warn("Already initialized - skipping duplicate connection");
+			lock (_initializeLock) {
+				if (_isInitialized) {
+					ResoniteMod.Warn("Already initialized - skipping duplicate connection");
+					return true;
+				}
+				
+				// Connect to bHaptics Player
+				bool connected = ModernBHaptics.bHapticsManager.Connect("Resonite", "Resonite", true, 10);
+				
+				if (!connected) {
+					ResoniteMod.Error("Failed to connect to bHaptics Player!");
+					ResoniteMod.Error("Make sure bHaptics Player is running and try restarting Resonite.");
+					return false;
+				}
+
+				_isInitialized = true;
+				ResoniteMod.Msg("bHapticsManager connected successfully!");
+				
+				// Log connected devices
+				int deviceCount = ModernBHaptics.bHapticsManager.GetConnectedDeviceCount();
+				ResoniteMod.Msg($"Connected devices: {deviceCount}");
+				
+				foreach (ModernBHaptics.PositionID pos in Enum.GetValues(typeof(ModernBHaptics.PositionID))) {
+					if (ModernBHaptics.bHapticsManager.IsDeviceConnected(pos)) {
+						ResoniteMod.Debug($"Device {pos} ready");
+						// Add to cache
+						DeviceCache[pos] = (true, DateTime.Now);
+					}
+				}
+
 				return true;
 			}
-			
-			// Connect to bHaptics Player
-			bool connected = ModernBHaptics.bHapticsManager.Connect("Resonite", "Resonite", true, 10);
-			
-			if (!connected) {
-				ResoniteMod.Error("Failed to connect to bHaptics Player!");
-				ResoniteMod.Error("Make sure bHaptics Player is running and try restarting Resonite.");
-				return false;
-			}
-
-			_isInitialized = true;
-			ResoniteMod.Msg("bHapticsManager connected successfully!");
-			
-			// Log connected devices
-			int deviceCount = ModernBHaptics.bHapticsManager.GetConnectedDeviceCount();
-			ResoniteMod.Msg($"Connected devices: {deviceCount}");
-			
-			foreach (ModernBHaptics.PositionID pos in Enum.GetValues(typeof(ModernBHaptics.PositionID))) {
-				if (ModernBHaptics.bHapticsManager.IsDeviceConnected(pos)) {
-					ResoniteMod.Debug($"Device {pos} ready");
-					// Add to cache
-					DeviceCache[pos] = (true, DateTime.Now);
-				}
-			}
-
-			return true;
 		}
 
 		public List<LegacyBHaptics.PositionType> GetConnectedDevices() {
@@ -185,7 +188,9 @@ namespace bHapticsManager {
 					ResoniteMod.Error($"Error clearing device cache: {ex}");
 				}
 				
-				_isInitialized = false;
+				lock (_initializeLock) {
+					_isInitialized = false;
+				}
 				ResoniteMod.Msg("bHaptics connection shutdown complete");
 			}
 			catch (Exception ex) {
