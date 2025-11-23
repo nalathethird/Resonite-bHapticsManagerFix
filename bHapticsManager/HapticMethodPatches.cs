@@ -13,7 +13,7 @@ namespace bHapticsManager {
 	public static class HapticMethodPatches {
 		public static void ApplyPatches(Harmony harmony) {
 			try {
-				harmony.PatchAll(typeof(IsActivePatch).Assembly);
+				harmony.PatchAll(typeof(HapticMethodPatches));
 				ResoniteMod.Debug("HapticMethodPatches applied successfully");
 			}
 			catch (Exception ex) {
