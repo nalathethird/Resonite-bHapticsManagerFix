@@ -98,6 +98,7 @@ namespace bHapticsManager {
 
                 lock (_lock)
                 {
+                    if (_disposed) return;
                     _workerThread?.OnDeviceDisconnected(position);
                 }
             }
