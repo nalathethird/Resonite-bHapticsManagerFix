@@ -42,6 +42,11 @@ namespace bHapticsManager {
 
         public override void OnEngineInit()
         {
+            InitializeStatic(GetConfiguration());
+        }
+
+        private static void InitializeStatic(ModConfiguration? config)
+        {
             try
             {
                 if (_initialized)
@@ -50,7 +55,7 @@ namespace bHapticsManager {
                     return;
                 }
 
-                Config = GetConfiguration()!;
+                Config = config!;
                 
                 if (Config == null)
                 {
