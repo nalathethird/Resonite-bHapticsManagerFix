@@ -12,6 +12,7 @@ namespace bHapticsManager {
     {
         private bool _disposed;
         private ModernBHapticsWorkerThread _workerThread = null!;
+        private readonly object _lock = new object();
 
         public void Initialize(ModernBHapticsWorkerThread workerThread)
         {
@@ -57,7 +58,10 @@ namespace bHapticsManager {
                     }
                 }
 
-                _workerThread?.OnDeviceConnected(position);
+                lock (_lock)
+                {
+                    _workerThread?.OnDeviceConnected(position);
+                }
             }
             catch (Exception ex)
             {
@@ -92,7 +96,10 @@ namespace bHapticsManager {
                     }
                 }
 
-                _workerThread?.OnDeviceDisconnected(position);
+                lock (_lock)
+                {
+                    _workerThread?.OnDeviceDisconnected(position);
+                }
             }
             catch (Exception ex)
             {
@@ -118,8 +125,11 @@ namespace bHapticsManager {
                 bHapticsManager.Error($"Error disposing event handlers: {ex}");
             }
 
-            _workerThread = null!;
-            _disposed = true;
+            lock (_lock)
+            {
+                _workerThread = null!;
+                _disposed = true;
+            }
         }
     }
 }
