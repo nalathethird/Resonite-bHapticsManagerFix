@@ -1,130 +1,141 @@
-// DeviceEventHandler.cs
-// Handles all bHaptics device events (connect, disconnect, battery changes)
-
+using System;
 using Elements.Core;
 using FrooxEngine;
 using ResoniteModLoader;
+using HarmonyLib;
 using ModernBHaptics = bHapticsLib;
+using LegacyBHaptics = Bhaptics.Tact;
 
 namespace bHapticsManager {
 	
-	public static class DeviceEventHandler {
-		
-		public static void Subscribe() {
-			ModernBHaptics.bHapticsManager.DeviceStatusChanged += OnDeviceStatusChanged;
-			ModernBHaptics.bHapticsManager.ConnectionEstablished += OnConnectionEstablished;
-			ModernBHaptics.bHapticsManager.ConnectionLost += OnConnectionLost;
-			ModernBHaptics.bHapticsManager.StatusChanged += OnStatusChanged;
-			
-			ResoniteMod.Msg("Event handlers subscribed successfully");
-		}
+	public class DeviceEventHandler : IDisposable
+    {
+        private volatile bool _disposed;
+        private ModernBHapticsWorkerThread _workerThread = null!;
+        private readonly object _lock = new object();
 
-		public static void OnDeviceStatusChanged(object sender, ModernBHaptics.DeviceStatusChangedEventArgs e) {
-			try {
-				string status = e.IsConnected ? "CONNECTED" : "DISCONNECTED";
-				ResoniteMod.Msg($"[Event] Device {e.Position} {status}");
-				
-				BHapticsConnection.InvalidateDeviceCache(e.Position, e.IsConnected);
-				
-				var engine = FrooxEngine.Engine.Current;
-				if (engine == null) {
-					ResoniteMod.Warn("Engine not ready for device registration - will retry on next connection");
-					return;
-				}
-				
-				var config = bHapticsManager.Config;
-				if (config == null) {
-					ResoniteMod.Warn("Config not ready - skipping event handling");
-					return;
-				}
-				
-				if (e.IsConnected) {
-					var legacyPosition = PositionMapper.MapModernToLegacy(e.Position);
-					LegacyCompatibilityLayer.ResetDevice(legacyPosition);
-					
-					if (config.GetValue(bHapticsManager.ENABLE_HOTPLUG)) {
-						_ = Task.Run(async () => {
-							try {
-								bool success = await DeviceRegistration.TryRegisterDeviceAsync(e.Position);
-								if (success) {
-									ResoniteMod.Msg($"Device {e.Position} registered and ready");
-								} else {
-									ResoniteMod.Warn($"Device {e.Position} registration failed");
-								}
-							}
-							catch (Exception ex) {
-								ResoniteMod.Error($"Error registering device {e.Position}: {ex.Message}");
-							}
-						});
-					}
-					else {
-						ResoniteMod.Warn($"Device {e.Position} connected, but hot-plug is disabled in config");
-					}
-				}
-				else {
-					_ = Task.Run(async () => {
-						try {
-							await DeviceRegistration.UnregisterDeviceAsync(e.Position);
-							
-							try {
-								ModernBHaptics.bHapticsManager.StopPlayingAll();
-							} catch { }
-							
-							var legacyPosition = PositionMapper.MapModernToLegacy(e.Position);
-							LegacyCompatibilityLayer.CleanupDevice(legacyPosition);
-							
-							ResoniteMod.Msg($"Device {e.Position} disconnected and cleaned up");
-						}
-						catch (Exception ex) {
-							ResoniteMod.Error($"Error during device {e.Position} cleanup: {ex.Message}");
-						}
-					});
-				}
-			}
-			catch (Exception ex) {
-				ResoniteMod.Error($"Error in OnDeviceStatusChanged: {ex.Message}");
-			}
-		}
+        public void Initialize(ModernBHapticsWorkerThread workerThread)
+        {
+            lock (_lock)
+            {
+                _workerThread = workerThread;
+            }
+            
+            try
+            {
+                BHapticsConnection.Instance.DeviceConnected += OnDeviceConnected;
+                BHapticsConnection.Instance.DeviceDisconnected += OnDeviceDisconnected;
+                
+                ResoniteMod.Debug("Event handlers subscribed successfully");
+            }
+            catch (Exception ex)
+            {
+                bHapticsManager.Error($"Failed to subscribe event handlers: {ex}");
+            }
+        }
 
-		public static void OnConnectionEstablished(object sender, EventArgs e) {
-			try {
-				ResoniteMod.Msg("Connection to bHaptics Player ESTABLISHED");
-				var deviceCount = ModernBHaptics.bHapticsManager.GetConnectedDeviceCount();
-				ResoniteMod.Msg($"Detected {deviceCount} device(s)");
-				
-				foreach (ModernBHaptics.PositionID pos in Enum.GetValues(typeof(ModernBHaptics.PositionID))) {
-					if (ModernBHaptics.bHapticsManager.IsDeviceConnected(pos)) {
-						ResoniteMod.Msg($"  - {pos}");
-					}
-				}
-			}
-			catch (Exception ex) {
-				ResoniteMod.Error($"Error in OnConnectionEstablished: {ex.Message}");
-			}
-		}
+        private void OnDeviceConnected(LegacyBHaptics.PositionType position)
+        {
+            if (_disposed) return;
 
-		public static void OnConnectionLost(object sender, EventArgs e) {
-			try {
-				ResoniteMod.Warn("Connection to bHaptics Player LOST");
-				ResoniteMod.Warn("Haptics will not work until connection is re-established");
-				if (bHapticsManager.AUTO_RECONNECT) {
-					ResoniteMod.Warn("Auto-reconnect is enabled - waiting for reconnection...");
-				}
-			}
-			catch (Exception ex) {
-				ResoniteMod.Error($"Error in OnConnectionLost: {ex.Message}");
-			}
-		}
+            try
+            {
+                bHapticsManager.Msg($"Device {position} connected");
+                
+                if (Engine.Current != null && Engine.Current.WorldManager != null)
+                {
+                    var focusedWorld = Engine.Current.WorldManager.FocusedWorld;
+                    if (focusedWorld != null)
+                    {
+                        focusedWorld.RunSynchronously(() =>
+                        {
+                            try
+                            {
+                                DeviceRegistration.RegisterDevice(position);
+                            }
+                            catch (Exception ex)
+                            {
+                                bHapticsManager.Error($"Failed to register device {position}: {ex}");
+                            }
+                        });
+                    }
+                }
 
-		public static void OnStatusChanged(object sender, ModernBHaptics.ConnectionStatusChangedEventArgs e) {
-			try {
-				if (bHapticsManager.Config?.GetValue(bHapticsManager.ENABLE_DIAGNOSTIC_LOGGING) ?? false) {
-					ResoniteMod.Msg($"Status changed: {e.PreviousStatus} -> {e.NewStatus}");
-				}
-			}
-			catch (Exception ex) {
-				ResoniteMod.Error($"Error in OnStatusChanged: {ex.Message}");
-			}
-		}
-	}
+                lock (_lock)
+                {
+                    if (_disposed) return;
+                    _workerThread?.OnDeviceConnected(position);
+                }
+            }
+            catch (Exception ex)
+            {
+                bHapticsManager.Error($"Error handling device connection for {position}: {ex}");
+            }
+        }
+
+        private void OnDeviceDisconnected(LegacyBHaptics.PositionType position)
+        {
+            if (_disposed) return;
+
+            try
+            {
+                bHapticsManager.Msg($"Device {position} disconnected");
+                
+                if (Engine.Current != null && Engine.Current.WorldManager != null)
+                {
+                    var focusedWorld = Engine.Current.WorldManager.FocusedWorld;
+                    if (focusedWorld != null)
+                    {
+                        focusedWorld.RunSynchronously(() =>
+                        {
+                            try
+                            {
+                                DeviceRegistration.UnregisterDevice(position);
+                            }
+                            catch (Exception ex)
+                            {
+                                bHapticsManager.Error($"Failed to unregister device {position}: {ex}");
+                            }
+                        });
+                    }
+                }
+
+                lock (_lock)
+                {
+                    if (_disposed) return;
+                    _workerThread?.OnDeviceDisconnected(position);
+                }
+            }
+            catch (Exception ex)
+            {
+                bHapticsManager.Error($"Error handling device disconnection for {position}: {ex}");
+            }
+        }
+
+        public void Dispose()
+        {
+            if (_disposed) return;
+            
+            _disposed = true;
+            
+            try
+            {
+                if (BHapticsConnection.Instance != null)
+                {
+                    BHapticsConnection.Instance.DeviceConnected -= OnDeviceConnected;
+                    BHapticsConnection.Instance.DeviceDisconnected -= OnDeviceDisconnected;
+                }
+                ResoniteMod.Debug("Event handlers unsubscribed");
+            }
+            catch (Exception ex)
+            {
+                bHapticsManager.Error($"Error disposing event handlers: {ex}");
+            }
+
+            lock (_lock)
+            {
+                _workerThread = null!;
+            }
+        }
+    }
 }

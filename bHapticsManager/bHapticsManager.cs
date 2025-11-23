@@ -1,19 +1,21 @@
+using System;
+using System.Collections.Generic;
 using System.Threading;
 using HarmonyLib;
 using ResoniteModLoader;
 using Elements.Core;
+using FrooxEngine;
 using ModernBHaptics = bHapticsLib;
 
 namespace bHapticsManager {
 	public class bHapticsManager : ResoniteMod {
-		internal const string VERSION_CONSTANT = "1.0.1";
+		internal const string VERSION_CONSTANT = "1.1.0";
 		public override string Name => "bHapticsManager";
 		public override string Author => "NalaTheThird";
 		public override string Version => VERSION_CONSTANT;
 		public override string Link => "https://github.com/nalathethird/bHapticsManager";
 
-		public static ModConfiguration Config;
-		private static bool _workerThreadStarted = false;
+		public static ModConfiguration? Config = null;
 
 		[AutoRegisterConfigKey]
 		public static readonly ModConfigurationKey<bool> ENABLE_HOTPLUG =
@@ -32,86 +34,314 @@ namespace bHapticsManager {
 		internal const int MAX_RETRIES = 10;
 		internal const bool AUTO_RECONNECT = true;
 
-		public override void OnEngineInit() {
-			Config = GetConfiguration();
-			Config.Save(true);
+		private static ModernBHapticsWorkerThread? _workerThread = null;
+        private static DeviceEventHandler? _eventHandler = null;
+        private static bool _initialized = false;
+        private static bool _patchesApplied = false;
+        private static bool _shutdownHookRegistered = false;
 
-			BHapticsConnection.Initialize();
+        public override void OnEngineInit()
+        {
+            try
+            {
+                if (_initialized)
+                {
+                    ResoniteMod.Debug("bHapticsManager already initialized, skipping");
+                    return;
+                }
 
-			var harmony = new Harmony("com.nalathethird.bHapticsManager");
-			harmony.PatchAll();
-			
-			if (!Config.GetValue(ENABLE_HOTPLUG)) {
-				Warn("Hot-plug is DISABLED - devices must be connected before starting Resonite");
-			}
-			
-			if (Config.GetValue(ENABLE_DIAGNOSTIC_LOGGING)) {
-				Msg("Diagnostic logging ENABLED - expect verbose output");
-			}
-			
-			FrooxEngine.Engine.Current.OnShutdown += OnEngineShutdown;
-			
-			Task.Run(async () => {
-				try {
-					if (Config.GetValue(ENABLE_DIAGNOSTIC_LOGGING)) {
-						Msg("Worker thread startup task executing - waiting for haptic points...");
-					}
-					
-					int retries = 0;
-					const int maxRetries = 100;
-					
-					while (retries < maxRetries) {
-						await Task.Delay(100);
-						
-						var engine = FrooxEngine.Engine.Current;
-						if (engine?.InputInterface != null && engine.InputInterface.HapticPointCount > 0) {
-							if (Config.GetValue(ENABLE_DIAGNOSTIC_LOGGING)) {
-								Msg($"Haptic points registered (count: {engine.InputInterface.HapticPointCount}) after {retries * 100}ms");
-							}
-							break;
-						}
-						
-						retries++;
-					}
-					
-					if (retries >= maxRetries) {
-						Warn("Timed out waiting for haptic points - worker thread may not function correctly");
-					}
-					
-					await Task.Delay(500);
-					
-					if (_workerThreadStarted) {
-						return;
-					}
-					
-					BHapticsConnection.StartWorkerThread();
-					_workerThreadStarted = true;
-				}
-				catch (Exception ex) {
-					Error($"Error in worker thread startup task: {ex.Message}");
-				}
-			});
+                Config = GetConfiguration()!;
+                
+                if (Config == null)
+                {
+                    Error("Failed to get mod configuration");
+                    return;
+                }
+
+                if (!_patchesApplied)
+                {
+                    try
+                    {
+                        Harmony harmony = new Harmony("com.bhaptics.resonite.fix");
+                        
+                        HapticPlayerPatches.ApplyPatches(harmony);
+                        ResoniteMod.Debug("HapticPlayerPatches applied");
+                        
+                        HapticMethodPatches.ApplyPatches(harmony);
+                        ResoniteMod.Debug("HapticMethodPatches applied");
+                        
+                        TorsoMapperFix.ApplyPatches(harmony);
+                        ResoniteMod.Debug("TorsoMapperFix applied");
+                        
+                        LegacyCompatibilityLayer.ApplyPatches(harmony);
+                        ResoniteMod.Debug("LegacyCompatibilityLayer applied");
+                        
+                        _patchesApplied = true;
+                        Msg("All patches applied successfully");
+                    }
+                    catch (Exception ex)
+                    {
+                        Error($"Failed to apply patches: {ex}");
+                    }
+                }
+
+                if (!BHapticsConnection.Initialize())
+                {
+                    Error("Failed to initialize bHaptics connection - is bHaptics Player running?");
+                    return;
+                }
+                
+                Msg("bHaptics connection initialized");
+
+                var engine = Engine.Current;
+                if (engine == null)
+                {
+                    Error("Engine.Current is null");
+                    return;
+                }
+
+                if (!_shutdownHookRegistered)
+                {
+                    try
+                    {
+                        engine.OnShutdownRequest += OnEngineShutdown;
+                        _shutdownHookRegistered = true;
+                        ResoniteMod.Debug("Shutdown hook registered");
+                    }
+                    catch (Exception ex)
+                    {
+                        Error($"Failed to register shutdown hook: {ex}");
+                    }
+                }
+
+                if (engine.WorldManager == null)
+                {
+                    Error("Engine.WorldManager is null");
+                    return;
+                }
+
+                var focusedWorld = engine.WorldManager.FocusedWorld;
+                if (focusedWorld == null)
+                {
+                    Warn("No focused world, initializing on next world focus");
+                    
+                    void WorldFocusedHandler(World world)
+                    {
+                        if (world != null)
+                        {
+                            // Check if initialization is needed and atomically set _initialized to true
+                            if (!Interlocked.CompareExchange(ref _initialized, true, false))
+                            {
+                                try
+                                {
+                                    world.RunSynchronously(() => InitializeHaptics());
+                                    // Unsubscribe from the event after first successful initialization
+                                    engine.WorldManager.WorldFocused -= WorldFocusedHandler;
+                                    ResoniteMod.Debug("WorldFocused event handler unsubscribed after initialization");
+                                }
+                                catch (Exception ex)
+                                {
+                                    Error($"Failed to initialize haptics on world focus: {ex}");
+                                    // Reset _initialized to allow retry on next world focus
+                                    Interlocked.Exchange(ref _initialized, false);
+                                }
+                            }
+                        }
+                    }
+                    
+                    engine.WorldManager.WorldFocused += WorldFocusedHandler;
+                }
+                else
+                {
+                    // Check if initialization is needed and atomically set _initialized to true
+                    if (!Interlocked.CompareExchange(ref _initialized, true, false))
+                    {
+                        focusedWorld.RunSynchronously(() => InitializeHaptics());
+                    }
+                }
+                Msg("bHapticsManager initialized successfully");
+            }
+            catch (Exception ex)
+            {
+                Error($"Failed to initialize bHapticsManager: {ex}");
+            }
+        }
+
+        private static void InitializeHaptics()
+        {
+            try
+            {
+                ResoniteMod.Debug("Initializing haptics system...");
+                
+                var connectedDevices = BHapticsConnection.Instance?.GetConnectedDevices();
+                if (connectedDevices == null || connectedDevices.Count == 0)
+                {
+                    Warn("No bHaptics devices detected");
+                    return;
+                }
+                
+                Msg($"Detected {connectedDevices.Count} device(s)");
+
+                var allPoints = new List<HapticPoint>();
+                foreach (var position in connectedDevices)
+                {
+                    try
+                    {
+                        DeviceRegistration.RegisterDevice(position);
+                        ResoniteMod.Debug($"Registered device: {position}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Error($"Failed to register device {position}: {ex}");
+                    }
+                }
+
+                var inputInterface = Engine.Current?.InputInterface;
+                if (inputInterface == null)
+                {
+                    Error("InputInterface is null, cannot initialize haptics");
+                    return;
+                }
+
+                int pointCount = inputInterface.HapticPointCount;
+                ResoniteMod.Debug($"Found {pointCount} haptic points registered");
+                
+                for (int i = 0; i < pointCount; i++)
+                {
+                    var point = inputInterface.GetHapticPoint(i);
+                    if (point != null)
+                    {
+                        allPoints.Add(point);
+                    }
+                }
+
+                if (allPoints.Count == 0)
+                {
+                    Warn("No haptic points available");
+                    return;
+                }
+
+                Msg($"Starting worker thread with {allPoints.Count} points across {connectedDevices.Count} devices");
+
+                try
+                {
+                    _workerThread = new ModernBHapticsWorkerThread(allPoints);
+                    ResoniteMod.Debug("Worker thread created successfully");
+                }
+                catch (Exception ex)
+                {
+                    Error($"Failed to create worker thread: {ex}");
+                    return;
+                }
+
+                try
+                {
+                    _eventHandler = new DeviceEventHandler();
+                    if (_workerThread != null)
+                    {
+                        _eventHandler.Initialize(_workerThread);
+                        ResoniteMod.Debug("Event handlers subscribed successfully");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Error($"Failed to initialize event handlers: {ex}");
+                }
+                
+                Msg("Haptics system initialized successfully");
+            }
+            catch (Exception ex)
+            {
+                Error($"Error initializing haptics: {ex}");
+            }
+        }
+
+        private static void OnEngineShutdown()
+        {
+            try
+            {
+                ResoniteMod.Debug("Engine shutdown requested.");
+                Msg("Starting bHapticsManager shutdown...");
+
+                if (_eventHandler != null)
+                {
+                    try
+                    {
+                        ResoniteMod.Debug("Disposing event handler...");
+                        _eventHandler.Dispose();
+                        _eventHandler = null;
+                        ResoniteMod.Debug("Event handler disposed");
+                    }
+                    catch (Exception ex)
+                    {
+                        Error($"Error disposing event handler: {ex}");
+                    }
+                }
+
+                if (_workerThread != null)
+                {
+                    try
+                    {
+                        ResoniteMod.Debug("Disposing worker thread...");
+                        _workerThread.Dispose();
+                        _workerThread = null;
+                        ResoniteMod.Debug("Worker thread disposed");
+                    }
+                    catch (Exception ex)
+                    {
+                        Error($"Error disposing worker thread: {ex}");
+                    }
+                }
+
+                try
+                {
+                    ResoniteMod.Debug("Clearing device registrations...");
+                    DeviceRegistration.ClearAllRegistrations();
+                    ResoniteMod.Debug("Device registrations cleared");
+                }
+                catch (Exception ex)
+                {
+                    Error($"Error clearing device registrations: {ex}");
+                }
+
+                try
+                {
+                    ResoniteMod.Debug("Shutting down bHaptics connection...");
+                    BHapticsConnection.Shutdown();
+                    ResoniteMod.Debug("bHaptics connection shutdown complete");
+                }
+                catch (Exception ex)
+                {
+                    Error($"Error shutting down bHaptics connection: {ex}");
+                }
+
+                _initialized = false;
+                Msg("bHapticsManager shutdown complete");
+            }
+            catch (Exception ex)
+            {
+                Error($"Critical error during shutdown: {ex}");
+            }
+        }
+
+		public static void Msg(string message)
+		{
+			ResoniteMod.Msg($"[bHapticsManager] {message}");
 		}
 
-		private void OnEngineShutdown() {
-			try {
-				try {
-					ModernBHaptics.bHapticsManager.StopPlayingAll();
-				} catch { }
-				
-				try {
-					BHapticsConnection.Shutdown();
-				} catch { }
-				
-				Thread.Sleep(100);
-			}
-			catch (Exception ex) {
-				Error("Error during shutdown: " + ex.Message);
-			}
+		public static void Warn(string message)
+		{
+			ResoniteMod.Warn($"[bHapticsManager] {message}");
 		}
 
-		public static void Error(Exception ex) {
-			ResoniteMod.Error(ex);
+		public static void Error(string message)
+		{
+			ResoniteMod.Error($"[bHapticsManager] {message}");
+		}
+
+		public static void Error(Exception ex)
+		{
+			ResoniteMod.Error($"[bHapticsManager] {ex}");
 		}
 	}
 }

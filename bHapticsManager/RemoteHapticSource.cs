@@ -1,7 +1,3 @@
-// RemoteHapticSource.cs
-// Implements IDirectHapticSource to inject remote haptic data into the local HapticPoint sampling system.
-// This allows remote users' haptics to be felt locally without breaking DirectTagHapticSource.
-
 using Elements.Core;
 using FrooxEngine;
 using System.Collections.Concurrent;
@@ -17,11 +13,12 @@ namespace bHapticsManager {
 		private readonly int _hapticPointIndex;
 		private readonly World _world;
 		private readonly RefID _refId;
+		private readonly DummyWorldElement _dummyParent;
 		
 		public RefID ReferenceID => _refId;
 		public string Name => $"RemoteHapticSource_{_hapticPointIndex}";
 		public World World => _world;
-		public IWorldElement Parent => null;
+		public IWorldElement Parent => _dummyParent;
 		public bool IsLocalElement => false;
 		public bool IsPersistent => false;
 		public bool IsRemoved => false;
@@ -31,6 +28,7 @@ namespace bHapticsManager {
 			_world = world;
 			ulong hash = (ulong)$"RemoteHapticSource_{hapticPointIndex}_{Guid.NewGuid()}".GetHashCode();
 			_refId = new RefID(hash);
+			_dummyParent = new DummyWorldElement(world);
 		}
 		
 		public float GetIntensity(SensationClass sensation) {
@@ -97,9 +95,29 @@ namespace bHapticsManager {
 		}
 		
 		public void ChildChanged(IWorldElement child) { }
-		public DataTreeNode Save(SaveControl control) => null;
+		public DataTreeNode Save(SaveControl control) => default!;
 		public void Load(DataTreeNode node, LoadControl control) { }
-		public string GetSyncMemberName(ISyncMember member) => null;
+		public string GetSyncMemberName(ISyncMember member) => string.Empty;
+		
+		private class DummyWorldElement : IWorldElement {
+			private readonly World _world;
+			
+			public DummyWorldElement(World world) {
+				_world = world;
+			}
+			
+			public RefID ReferenceID => RefID.Null;
+			public string Name => "DummyParent";
+			public World World => _world;
+			public IWorldElement Parent => null;
+			public bool IsLocalElement => false;
+			public bool IsPersistent => false;
+			public bool IsRemoved => false;
+			public void ChildChanged(IWorldElement child) { }
+			public DataTreeNode Save(SaveControl control) => default!;
+			public void Load(DataTreeNode node, LoadControl control) { }
+			public string GetSyncMemberName(ISyncMember member) => string.Empty;
+		}
 		
 		private struct RemoteHapticData {
 			public float Force;

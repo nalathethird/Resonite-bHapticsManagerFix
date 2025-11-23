@@ -1,7 +1,3 @@
-// TorsoMapperFix.cs
-// Harmony patch to fix the 90 degree rotation bug in TorsoHapticPointMapper
-// The original code uses GetClosestAxis() which snaps to the wrong axis on rotated avatars
-
 using HarmonyLib;
 using Elements.Core;
 using FrooxEngine;
@@ -13,6 +9,18 @@ using ResoniteModLoader;
 
 namespace bHapticsManager {
 	
+	public static class TorsoMapperFix {
+		public static void ApplyPatches(Harmony harmony) {
+			try {
+				harmony.PatchAll(typeof(TorsoMapperFix));
+				ResoniteMod.Debug("TorsoMapperFix patches applied successfully");
+			}
+			catch (Exception ex) {
+				ResoniteMod.Error($"Failed to apply TorsoMapperFix: {ex}");
+			}
+		}
+	}
+	
 	[HarmonyPatch(typeof(CommonAvatarBuilder), "BuildAvatar")]
 	public static class CommonAvatarBuilderPatch {
 		
@@ -20,7 +28,6 @@ namespace bHapticsManager {
 		
 		static void Postfix(UserRoot userRoot) {
 			try {
-				// Only apply the TorsoMapper patch once when first avatar is equipped
 				if (!_torsoMapperPatchApplied) {
 					var harmony = new Harmony("com.nalathethird.bHapticsManager.TorsoMapper");
 					ApplyTorsoMapperPatch(harmony);
@@ -34,9 +41,8 @@ namespace bHapticsManager {
 		
 		private static void ApplyTorsoMapperPatch(Harmony harmony) {
 			try {
-				// Find TorsoHapticPointMapper type
 				var frooxEngineAssembly = typeof(FrooxEngine.Engine).Assembly;
-				Type torsoMapperType = frooxEngineAssembly.GetType("FrooxEngine.TorsoHapticPointMapper", false)
+				Type? torsoMapperType = frooxEngineAssembly.GetType("FrooxEngine.TorsoHapticPointMapper", false)
 					?? frooxEngineAssembly.GetType("TorsoHapticPointMapper", false);
 				
 				if (torsoMapperType == null) {
@@ -44,19 +50,17 @@ namespace bHapticsManager {
 					return;
 				}
 				
-				// Find MapPoints method with correct signature: (HapticManager, float, Span<float>)
 				var mapPointsMethod = torsoMapperType.GetMethod("MapPoints", 
 					BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance,
 					null,
 					new Type[] { 
-						frooxEngineAssembly.GetType("FrooxEngine.HapticManager"),
+						frooxEngineAssembly.GetType("FrooxEngine.HapticManager")!,
 						typeof(float),
 						typeof(Span<float>)
 					},
 					null);
 				
 				if (mapPointsMethod == null) {
-					// Fallback: try finding any MapPoints method
 					mapPointsMethod = torsoMapperType.GetMethod("MapPoints", 
 						BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
 					
@@ -66,8 +70,7 @@ namespace bHapticsManager {
 					}
 				}
 				
-				// Find SlotPositioning.GetClosestAxis method - we need this to identify it in IL
-				Type slotPositioningType = frooxEngineAssembly.GetType("FrooxEngine.SlotPositioning", false)
+				Type? slotPositioningType = frooxEngineAssembly.GetType("FrooxEngine.SlotPositioning", false)
 					?? frooxEngineAssembly.GetType("SlotPositioning", false);
 				
 				if (slotPositioningType == null) {
@@ -82,7 +85,6 @@ namespace bHapticsManager {
 					null);
 				
 				if (getClosestAxisMethod == null) {
-					// Try without byref parameter
 					getClosestAxisMethod = slotPositioningType.GetMethod("GetClosestAxis",
 						BindingFlags.Public | BindingFlags.Static);
 				}
@@ -92,7 +94,6 @@ namespace bHapticsManager {
 					return;
 				}
 				
-				// Apply transpiler patch
 				var transpiler = typeof(TorsoMapperFixTranspiler).GetMethod(
 					nameof(TorsoMapperFixTranspiler.ReplaceGetClosestAxis), 
 					BindingFlags.Public | BindingFlags.Static);
@@ -102,7 +103,6 @@ namespace bHapticsManager {
 					return;
 				}
 				
-				// Store reference to GetClosestAxis for the transpiler
 				TorsoMapperFixTranspiler.TargetMethod = getClosestAxisMethod;
 				
 				harmony.Patch(mapPointsMethod, transpiler: new HarmonyMethod(transpiler));
@@ -117,7 +117,7 @@ namespace bHapticsManager {
 	
 	public static class TorsoMapperFixTranspiler {
 		
-		public static MethodInfo TargetMethod;
+		public static MethodInfo TargetMethod = null!;
 		
 		public static float3 IdentityGetClosestAxis(Slot slot, float3 direction) {
 			return direction;
@@ -132,7 +132,6 @@ namespace bHapticsManager {
 				var codes = new List<CodeInstruction>(instructions);
 				int patchedCount = 0;
 				
-				// Get reference to our identity functions
 				var identityMethod = typeof(TorsoMapperFixTranspiler).GetMethod(
 					nameof(IdentityGetClosestAxis), 
 					BindingFlags.Public | BindingFlags.Static);
@@ -146,23 +145,18 @@ namespace bHapticsManager {
 					return instructions;
 				}
 				
-				// Find and replace all GetClosestAxis calls
 				for (int i = 0; i < codes.Count; i++) {
 					var instruction = codes[i];
 					
-					// Check if this is a call to GetClosestAxis
 					if ((instruction.opcode == OpCodes.Call || instruction.opcode == OpCodes.Callvirt) && 
 					    instruction.operand is MethodInfo method) {
 						
-						// Check if this is our target method
 						if (method == TargetMethod || 
 						    (method.Name == "GetClosestAxis" && method.DeclaringType?.Name == "SlotPositioning")) {
 							
-							// Determine which identity function to use based on parameter types
 							var parameters = method.GetParameters();
 							bool useByRef = parameters.Length > 1 && parameters[1].ParameterType.IsByRef;
 							
-							// Replace with call to our identity function
 							codes[i] = new CodeInstruction(OpCodes.Call, useByRef ? identityMethodByRef : identityMethod);
 							
 							patchedCount++;
@@ -171,7 +165,7 @@ namespace bHapticsManager {
 				}
 				
 				if (patchedCount > 0) {
-					ResoniteMod.Msg($"Replaced {patchedCount} GetClosestAxis call(s)");
+					ResoniteMod.Debug($"Replaced {patchedCount} GetClosestAxis call(s)");
 				} else {
 					ResoniteMod.Warn("No GetClosestAxis calls found - method may have changed");
 				}
@@ -180,7 +174,7 @@ namespace bHapticsManager {
 			}
 			catch (Exception ex) {
 				ResoniteMod.Error($"Transpiler error: {ex.Message}");
-				return instructions; // Return original on error
+				return instructions;
 			}
 		}
 	}

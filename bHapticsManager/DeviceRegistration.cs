@@ -1,7 +1,8 @@
-// Handles dynamic registration of haptic points for hot-plugged devices
-
 using Elements.Core;
 using FrooxEngine;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using ResoniteModLoader;
@@ -11,13 +12,30 @@ using ModernBHaptics = bHapticsLib;
 namespace bHapticsManager {
 
 	public static class DeviceRegistration {
-		private static readonly HashSet<ModernBHaptics.PositionID> _registeredDevices = new();
+		private static readonly HashSet<ModernBHaptics.PositionID> _registeredDevices = new HashSet<ModernBHaptics.PositionID>();
 		private static readonly Dictionary<ModernBHaptics.PositionID, Task> _pendingRegistrations = new();
 		
 		private static InputInterface? _inputInterface;
 		private static BHapticsDriver? _bhapticsDriver;
 		
 		private static readonly object _registrationLock = new object();
+
+		public static void RegisterDevice(LegacyBHaptics.PositionType position) {
+			var modernPos = PositionMapper.MapLegacyToModern(position);
+			TryRegisterDevice(modernPos);
+		}
+
+		public static void UnregisterDevice(LegacyBHaptics.PositionType position) {
+			var modernPos = PositionMapper.MapLegacyToModern(position);
+			UnregisterDevice(modernPos);
+		}
+
+		public static void ClearAllRegistrations() {
+			lock (_registrationLock) {
+				_registeredDevices.Clear();
+				_pendingRegistrations.Clear();
+			}
+		}
 
 		public static Task<bool> TryRegisterDeviceAsync(ModernBHaptics.PositionID position) {
 			lock (_registrationLock) {
@@ -65,7 +83,7 @@ namespace bHapticsManager {
 				
 				var legacyPosition = PositionMapper.MapModernToLegacy(position);
 
-				ResoniteMod.Msg($"Registering haptic points for device: {position}");
+				ResoniteMod.Debug($"Registering haptic points for device: {position}");
 				
 				await Task.Delay(100);
 				
@@ -75,7 +93,7 @@ namespace bHapticsManager {
 					lock (_registrationLock) {
 						_registeredDevices.Add(position);
 					}
-					ResoniteMod.Msg($"Registered {position} successfully");
+					ResoniteMod.Debug($"Registered {position} successfully");
 					
 					await RefreshHapticPointSamplersAsync();
 				}
@@ -259,7 +277,7 @@ namespace bHapticsManager {
 				totalRefreshed = results.Sum();
 
 				if (totalRefreshed > 0) {
-					ResoniteMod.Msg($"Refreshed {totalRefreshed} haptic sampler(s)");
+					ResoniteMod.Debug($"Refreshed {totalRefreshed} haptic sampler(s)");
 				}
 			}
 			catch (Exception ex) {

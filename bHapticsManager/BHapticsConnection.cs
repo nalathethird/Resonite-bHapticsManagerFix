@@ -1,29 +1,46 @@
-// BHapticsConnection.cs
-// Handles connection initialization to bHaptics Player
-
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using Elements.Core;
 using FrooxEngine;
 using ResoniteModLoader;
 using ModernBHaptics = bHapticsLib;
+using LegacyBHaptics = Bhaptics.Tact;
 
 namespace bHapticsManager {
 	
-	public static class BHapticsConnection {
+	public class BHapticsConnection {
+		private static BHapticsConnection _instance = null!;
+		public static BHapticsConnection Instance => _instance ??= new BHapticsConnection();
+		
 		public static readonly Dictionary<ModernBHaptics.PositionID, (bool isActive, DateTime lastCheck)> DeviceCache = new();
 		
-		private static ModernBHapticsWorkerThread _workerThread;
+		private static ModernBHapticsWorkerThread _workerThread = null!;
 		private static bool _isInitialized = false;
+		private static readonly object _shutdownLock = new();
+		private static bool _isShuttingDown = false;
+
+		// Events for device connection/disconnection - used by DeviceEventHandler
+		public event Action<LegacyBHaptics.PositionType>? DeviceConnected;
+		public event Action<LegacyBHaptics.PositionType>? DeviceDisconnected;
+
+		// Event raising methods
+		internal void RaiseDeviceConnected(LegacyBHaptics.PositionType position) {
+			DeviceConnected?.Invoke(position);
+		}
+
+		internal void RaiseDeviceDisconnected(LegacyBHaptics.PositionType position) {
+			DeviceDisconnected?.Invoke(position);
+		}
 
 		/// Initializes connection to bHaptics Player and subscribes to events.
 		/// Called once during mod initialization.
 		
-		public static void Initialize() {
+		public static bool Initialize() {
 			if (_isInitialized) {
 				ResoniteMod.Warn("Already initialized - skipping duplicate connection");
-				return;
+				return true;
 			}
-			
-			DeviceEventHandler.Subscribe();
 			
 			// Connect to bHaptics Player
 			bool connected = ModernBHaptics.bHapticsManager.Connect("Resonite", "Resonite", true, 10);
@@ -31,7 +48,7 @@ namespace bHapticsManager {
 			if (!connected) {
 				ResoniteMod.Error("Failed to connect to bHaptics Player!");
 				ResoniteMod.Error("Make sure bHaptics Player is running and try restarting Resonite.");
-				return;
+				return false;
 			}
 
 			_isInitialized = true;
@@ -43,11 +60,28 @@ namespace bHapticsManager {
 			
 			foreach (ModernBHaptics.PositionID pos in Enum.GetValues(typeof(ModernBHaptics.PositionID))) {
 				if (ModernBHaptics.bHapticsManager.IsDeviceConnected(pos)) {
-					ResoniteMod.Msg($"  - {pos} device ready");
+					ResoniteMod.Debug($"Device {pos} ready");
 					// Add to cache
 					DeviceCache[pos] = (true, DateTime.Now);
 				}
 			}
+
+			return true;
+		}
+
+		public List<LegacyBHaptics.PositionType> GetConnectedDevices() {
+			var connectedDevices = new List<LegacyBHaptics.PositionType>();
+			
+			foreach (ModernBHaptics.PositionID pos in Enum.GetValues(typeof(ModernBHaptics.PositionID))) {
+				if (ModernBHaptics.bHapticsManager.IsDeviceConnected(pos)) {
+					var legacyPos = PositionMapper.MapModernToLegacy(pos);
+					if (!connectedDevices.Contains(legacyPos)) {
+						connectedDevices.Add(legacyPos);
+					}
+				}
+			}
+			
+			return connectedDevices;
 		}
 		
 		
@@ -80,7 +114,7 @@ namespace bHapticsManager {
 				_workerThread = new ModernBHapticsWorkerThread(inputInterface);
 				_workerThread.Start();
 				
-				ResoniteMod.Msg("Worker thread started successfully");
+				ResoniteMod.Debug("Worker thread started successfully");
 			}
 			catch (Exception ex) {
 				ResoniteMod.Error($"Failed to start worker thread: {ex.Message}");
@@ -90,25 +124,77 @@ namespace bHapticsManager {
 		/// Shuts down the connection to bHaptics Player, stopping all patterns and clearing the device cache.
 		
 		public static void Shutdown() {
+			lock (_shutdownLock) {
+				if (_isShuttingDown) {
+					ResoniteMod.Warn("Shutdown already in progress");
+					return;
+				}
+				_isShuttingDown = true;
+			}
+			
 			try {
-				_workerThread?.Stop();
-				_workerThread = null;
+				ResoniteMod.Debug("Starting bHaptics connection shutdown...");
 				
-				ModernBHaptics.bHapticsManager.StopPlayingAll();
-				
-				bool disconnected = ModernBHaptics.bHapticsManager.Disconnect();
-				
-				if (disconnected) {
-					ResoniteMod.Msg("Disconnected successfully");
-				} else {
-					ResoniteMod.Warn("Disconnect returned false");
+				// Stop worker thread first
+				if (_workerThread != null) {
+					try {
+						ResoniteMod.Debug("Stopping worker thread...");
+						_workerThread.Stop();
+						_workerThread = null!;
+						ResoniteMod.Debug("Worker thread stopped");
+					}
+					catch (Exception ex) {
+						ResoniteMod.Error($"Error stopping worker thread: {ex}");
+					}
 				}
 				
-				DeviceCache.Clear();
+				// Stop all haptic playback
+				try {
+					ResoniteMod.Debug("Stopping all haptic playback...");
+					ModernBHaptics.bHapticsManager.StopPlayingAll();
+					ResoniteMod.Debug("Haptic playback stopped");
+				}
+				catch (Exception ex) {
+					ResoniteMod.Error($"Error stopping haptic playback: {ex}");
+				}
+				
+				// Small delay to ensure all patterns are stopped
+				System.Threading.Thread.Sleep(100);
+				
+				// Disconnect from bHaptics Player
+				try {
+					ResoniteMod.Debug("Disconnecting from bHaptics Player...");
+					bool disconnected = ModernBHaptics.bHapticsManager.Disconnect();
+					
+					if (disconnected) {
+						ResoniteMod.Debug("Disconnected from bHaptics Player successfully");
+					} else {
+						ResoniteMod.Warn("Disconnect returned false - may already be disconnected");
+					}
+				}
+				catch (Exception ex) {
+					ResoniteMod.Error($"Error disconnecting from bHaptics Player: {ex}");
+				}
+				
+				// Clear caches
+				try {
+					DeviceCache.Clear();
+					ResoniteMod.Debug("Device cache cleared");
+				}
+				catch (Exception ex) {
+					ResoniteMod.Error($"Error clearing device cache: {ex}");
+				}
+				
 				_isInitialized = false;
+				ResoniteMod.Msg("bHaptics connection shutdown complete");
 			}
 			catch (Exception ex) {
-				ResoniteMod.Error($"Error during shutdown: {ex.Message}");
+				ResoniteMod.Error($"Error during bHaptics connection shutdown: {ex}");
+			}
+			finally {
+				lock (_shutdownLock) {
+					_isShuttingDown = false;
+				}
 			}
 		}
 		
