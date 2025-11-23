@@ -41,7 +41,7 @@ body:
       label: Feature Category
       description: What area does this feature relate to?
       options:
-        - Device management / hot-plug
+        - Device management / Hot-plug
         - Haptic feedback / motor control
         - Configuration options
         - Performance / optimization
