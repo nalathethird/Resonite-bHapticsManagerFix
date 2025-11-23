@@ -173,8 +173,14 @@ namespace bHapticsManager {
             {
                 ResoniteMod.Debug("Initializing haptics system...");
                 
-                var connectedDevices = BHapticsConnection.Instance?.GetConnectedDevices();
-                if (connectedDevices == null || connectedDevices.Count == 0)
+                if (BHapticsConnection.Instance == null)
+                {
+                    Error("BHapticsConnection.Instance is null - connection not properly initialized");
+                    return;
+                }
+                
+                var connectedDevices = BHapticsConnection.Instance.GetConnectedDevices();
+                if (connectedDevices.Count == 0)
                 {
                     Warn("No bHaptics devices detected");
                     return;
