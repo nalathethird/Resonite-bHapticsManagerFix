@@ -55,13 +55,13 @@ namespace bHapticsManager {
                     return;
                 }
 
-                Config = config!;
-                
-                if (Config == null)
+                if (config == null)
                 {
                     Error("Failed to get mod configuration");
                     return;
                 }
+                
+                Config = config;
 
                 if (!_patchesApplied)
                 {
